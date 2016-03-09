@@ -70,8 +70,13 @@
     [self.window.contentView resizeTo:frame];
 }
 
-- (void)writeDirection:(NSString *)directionStr; {
-    [self.window.contentView writeDirection:directionStr];
+- (void)writeDirection:(NSMutableArray *)directions; {
+    NSLog(@" 写到窗口的方向符号 %@", directions);
+    [self.window.contentView writeDirection:directions];
+}
+
+- (void)writePoint:(NSPoint *)point; {
+    [self.window.contentView writePoint:point];
 }
 
 @end

@@ -17,12 +17,15 @@
 	NSUInteger radius;
 
 	NSMutableArray *points; // NSPoint array
-	NSString* directionToDraw;
+    NSMutableArray *debugPoints; // NSPoint array
+    NSMutableArray *_directions;
+
 }
 
 - (void)clear;
 - (void)resizeTo:(NSRect)frame;
 - (void)setEnable:(BOOL)shouldEnable;
-- (void)writeDirection:(NSString *)directionStr;
+- (void)writeDirection:(NSMutableArray *)directions;
+- (void)writePoint:(NSPoint *)point;
 
 @end

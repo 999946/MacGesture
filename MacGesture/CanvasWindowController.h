@@ -16,7 +16,7 @@
 
 - (void)handleMouseEvent:(NSEvent *)event;
 - (void)handleScreenParametersChange:(NSNotification *)notification;
-- (void)writeDirection:(NSString *)directionStr;
-
+- (void)writeDirection:(NSMutableArray *)directions;
+- (void)writePoint:(NSPoint *)point;
 - (void)reinitWindow; // reinit canvas window for dual screen
 @end

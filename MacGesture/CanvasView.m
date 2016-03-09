@@ -16,6 +16,10 @@ static NSImage* leftImage;
 static NSImage* rightImage;
 static NSImage* upImage;
 static NSImage* downImage;
+static NSImage* leftUpImage;
+static NSImage* rightUpImage;
+static NSImage* leftDownImage;
+static NSImage* rightDownImage;
 
 - (id)initWithFrame:(NSRect)frame
 {
@@ -25,11 +29,16 @@ static NSImage* downImage;
     rightImage = [NSImage imageNamed:@"right.png"];
     downImage = [NSImage imageNamed:@"down.png"];
     upImage = [NSImage imageNamed:@"up.png"];
-
+    leftUpImage = [NSImage imageNamed:@"left-up.png"];
+    rightUpImage = [NSImage imageNamed:@"right-up.png"];
+    leftDownImage = [NSImage imageNamed:@"left-down.png"];
+    rightDownImage = [NSImage imageNamed:@"right-down.png"];
+    
     if (self) {
 		color = [MGOptionsDefine getLineColor];
         points = [[NSMutableArray alloc] init];
-        directionToDraw = @"";
+        debugPoints = [[NSMutableArray alloc] init];
+        _directions = [[NSMutableArray alloc] init];
 		radius = 2;
 	}
 
@@ -40,25 +49,38 @@ static NSImage* downImage;
     if(![[NSUserDefaults standardUserDefaults] boolForKey:@"showGesturePreview"]){
         return;
     }
-
+    NSLog(@"画到窗口上 %@", _directions);
+    NSLog(@"_directions =  %@", _directions);
     // This should be called in drawRect
     CGRect screenRect = [[NSScreen mainScreen] frame];
     NSInteger y = (screenRect.size.height - leftImage.size.height) / 2;
-    NSInteger beginx = (screenRect.size.width - leftImage.size.width * directionToDraw.length) / 2;
-    for(NSInteger i = 0;i<directionToDraw.length;i++){
+    NSInteger beginx = (screenRect.size.width - leftImage.size.width * _directions.count) / 2;
+    for(NSInteger i = 0;i < _directions.count;i++){
         NSImage *image = nil;
-        switch([directionToDraw characterAtIndex:i]){
-            case 'L':
+        switch([_directions[i] characterAtIndex:0]){
+            case '4':
                 image = leftImage;
                 break;
-            case 'R':
+            case '6':
                 image = rightImage;
                 break;
-            case 'U':
+            case '8':
                 image = upImage;
                 break;
-            case 'D':
+            case '2':
                 image = downImage;
+                break;
+            case '7':
+                image = leftUpImage;
+                break;
+            case '9':
+                image = rightUpImage;
+                break;
+            case '1':
+                image = leftDownImage;
+                break;
+            case '3':
+                image = rightDownImage;
                 break;
             default:
                 break;
@@ -73,7 +95,7 @@ static NSImage* downImage;
     if(![[NSUserDefaults standardUserDefaults] boolForKey:@"showGestureNote"]){
         return;
     }
-    NSInteger index = [[RulesList sharedRulesList] suitedRuleWithGesture:directionToDraw];
+    NSInteger index = [[RulesList sharedRulesList] suitedRuleWithGesture:_directions];
     NSString* note = @"";
     if(index == -1)
         return;
@@ -114,7 +136,18 @@ static NSImage* downImage;
         }
         [path stroke];
     }
-
+    NSLog(@"绘画的_directions 》》 %@", _directions);
+    [[NSColor redColor] setStroke];
+    // NSLog(@"debugPoints.count = %ld", debugPoints.count);
+    if(debugPoints.count >= 1){
+        for (int i = 0; i < debugPoints.count; i++) {
+            // NSLog(@"x = %f y = %f", [debugPoints[i] pointValue].x, [debugPoints[i] pointValue].y);
+            NSRect rect1 = NSMakeRect([debugPoints[i] pointValue].x, [debugPoints[i] pointValue].y, 1, 1);
+            [NSBezierPath fillRect:rect1];
+            [[NSString stringWithFormat:@"(%f, %f)",[debugPoints[i] pointValue].x, [debugPoints[i] pointValue].y] drawAtPoint:NSMakePoint([debugPoints[i] pointValue].x, [debugPoints[i] pointValue].y) withAttributes:NULL];
+        }
+    }
+    
     //[textImage drawInRect:NSScreen.mainScreen.frame fromRect:NSZeroRect operation:NSCompositeSourceOver fraction:1.0];
     [self drawDirection];
     [self drawNote];
@@ -144,7 +177,8 @@ static NSImage* downImage;
 
 - (void)clear {
     [points removeAllObjects];
-    directionToDraw = @"";
+    [debugPoints removeAllObjects];
+    [_directions removeAllObjects];
     self.needsDisplay = YES;
 }
 
@@ -201,16 +235,20 @@ static NSImage* downImage;
 
 - (void)mouseUp:(NSEvent *)event
 {
-	[self clear];
+	 [self clear];
 }
 
 
-- (void)writeDirection:(NSString *)directionStr;
+- (void)writeDirection:(NSMutableArray *)directions;
 {
-
-    directionToDraw = directionStr;
-
+    
+    _directions = directions;
+    NSLog(@"directionStr 改变>> %@", directions);
     self.needsDisplay = YES;
+}
+- (void)writePoint:(NSPoint *)point;
+{
+    [debugPoints addObject:[NSValue valueWithPoint:*point]];
 }
 
 @end

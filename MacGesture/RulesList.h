@@ -47,9 +47,9 @@ typedef enum{
 - (void)setDirection:(NSString*)direction atIndex:(NSUInteger)index;
 - (void)setNote:(NSString*)note atIndex:(NSUInteger)index;
 
-- (bool)handleGesture:(NSString*)gesture;
+- (bool)handleGesture:(NSMutableArray*)gesture;
 
-- (NSInteger)suitedRuleWithGesture:(NSString*)gesture;
+- (NSInteger)suitedRuleWithGesture:(NSMutableArray*)gesture;
 
 - (void)reInit;
 - (void)save;

@@ -1,4 +1,3 @@
-
 #import "AppDelegate.h"
 #import "AppPrefsWindowController.h"
 #import "CanvasWindowController.h"
@@ -6,14 +5,15 @@
 #import "utils.h"
 #import "NSBundle+LoginItem.h"
 #import "BlackWhiteFilter.h"
-
+#import "math.h"
 
 @implementation AppDelegate
 
 
 static CanvasWindowController *windowController;
 static CGEventRef mouseDownEvent, mouseDraggedEvent;
-static NSMutableString *direction;
+static NSMutableArray *directions;
+static NSMutableDictionary *mark;
 static NSPoint lastLocation;
 static CFMachPortRef mouseEventTap;
 static bool isEnable;
@@ -21,7 +21,6 @@ static AppPrefsWindowController *_preferencesWindowController;
 
 + (AppDelegate *)appDelegate
 {
-
     return (AppDelegate *)[[NSApplication sharedApplication] delegate];
 }
 
@@ -36,7 +35,8 @@ static AppPrefsWindowController *_preferencesWindowController;
     CFRelease(mouseEventTap);
     CFRelease(runLoopSource);
 
-    direction = [NSMutableString string];
+    directions = [[NSMutableArray alloc] init];
+    mark = [[NSMutableDictionary alloc] init];
     isEnable = true;
 
     if(![[NSUserDefaults standardUserDefaults] boolForKey:@"hasRunBefore"]){
@@ -100,70 +100,149 @@ static AppPrefsWindowController *_preferencesWindowController;
     [_preferencesWindowController showWindow:self];
 }
 
-static void updateDirections(NSEvent* event) {
-    // not thread safe
-    NSPoint newLocation = event.locationInWindow;
-    double deltaX = newLocation.x - lastLocation.x;
-    double deltaY = newLocation.y - lastLocation.y;
-    double absX = fabs(deltaX);
-    double absY = fabs(deltaY);
-    if (absX + absY < 20) {
-
-        return; // ignore short distance
-    }
-
-
+static bool appendDirection(NSString* direction, NSPoint location) {
     unichar lastDirectionChar;
-    if(direction.length>0) {
-        lastDirectionChar = [direction characterAtIndex:direction.length - 1];
+    if(mark.count > 0) {
+        NSString *key = [NSString stringWithFormat:@"%@,%ld",direction, mark.count-1];
+        NSMutableDictionary *directionData = [mark objectForKey:key];
+        if(directionData != nil){
+            lastDirectionChar = [[directionData objectForKey:@"direction"] characterAtIndex:0];
+        }else{
+            lastDirectionChar = ' ';
+        }
+        // lastDirectionChar = [directions characterAtIndex:directions.length - 1];
+        NSLog(@"---------------lastDirectionChar >> %c", lastDirectionChar);
     }else{
         lastDirectionChar = ' ';
     }
-    lastLocation = event.locationInWindow;
-
-
-    if (absX> absY) {
-        if (deltaX> 0) {
-            if (lastDirectionChar != [@"R" characterAtIndex:0]) {
-                [direction appendString:@"R"];
-                [windowController writeDirection:direction];
-                return;
-            }
-        } else{
-            if (lastDirectionChar != [@"L" characterAtIndex:0]) {
-                [direction appendString:@"L"];
-                [windowController writeDirection:direction];
-                return;
-            }
+    NSLog(@" ====================================== ");
+    NSLog(@"最后一个方向 lastDirectionChar >> %c", lastDirectionChar);
+    NSLog(@"正发生的方向 direction >> %c", [direction characterAtIndex:0]);
+    if (lastDirectionChar != [direction characterAtIndex:0]) {
+        // 如果方向发生改变
+        // 1. 添加上一个点到新点的路线
+        NSMutableArray *path = [[NSMutableArray alloc]init];
+        [path addObject: [NSValue valueWithPoint: lastLocation]];
+        [path addObject: [NSValue valueWithPoint: location]];
+        // 2. 添加一个新的方向
+        NSMutableDictionary *directionData = [[NSMutableDictionary alloc] init];
+        NSString *key = [NSString stringWithFormat:@"%@,%ld",direction, mark.count];
+        [directionData setObject:direction forKey:@"direction"];
+        [directionData setObject:path forKey:@"path"];
+        NSLog(@"添加一个新的方向 %@ > key=%@", direction, key);
+        // 3. 记录最后的点坐标
+        lastLocation = location;
+        // 4. 判断是否是产生了新的有效方向
+        double deltaX = fabs(location.x - lastLocation.x);
+        double deltaY = fabs(location.y - lastLocation.y);
+        if((deltaY + deltaX) / 2 > 50){
+            [directionData setValue:[NSNumber numberWithBool:YES] forKey:@"append"];
+            [directions addObject:direction];
+            [windowController writeDirection:directions];
+        }else{
+            NSLog(@"~~~~~~~ 线还太短了, 才%f。", (deltaY + deltaX) / 2);
         }
-    } else {
-        if (deltaY> 0) {
-            if (lastDirectionChar != [@"U" characterAtIndex:0]) {
-                [direction appendString:@"U"];
-                [windowController writeDirection:direction];
-                return;
+        [mark setObject:directionData forKey:key];
+        
+        return true;
+    }else{
+        // 如果方向与上次的一样， 修改该方向最后一个坐标
+        // 1. 取出最后的方向数据
+        NSString *key = [NSString stringWithFormat:@"%@,%ld",direction, mark.count-1];
+        NSMutableDictionary *directionData = [mark objectForKey:key];
+        NSMutableArray *path = [directionData objectForKey:@"path"];
+        bool append = [[directionData objectForKey:@"append"]boolValue];
+        // 判断是否符合长度了， 如果符合则可不需要任何操作等待下一个方向
+        if (!append) {
+            // 2. 更新线（由于不需要用到， 忽略）
+            // 3. 判断线是否符合长度了
+            NSPoint first = [[path firstObject] pointValue];
+            double deltaX = fabs(location.x - first.x);
+            double deltaY = fabs(location.y - first.y);
+            if((deltaY + deltaX) / 2 > 50){
+                [directionData setValue:[NSNumber numberWithBool:YES] forKey:@"append"];
+                [directions addObject:direction];
+                [windowController writeDirection:directions];
+            }else{
+                NSLog(@"2>>> ~~~~~~~ 线还太短了, 才%f。", (deltaY + deltaX) / 2);
             }
-        } else {
-            if (lastDirectionChar != [@"D" characterAtIndex:0]) {
-                [direction appendString:@"D"];
-                [windowController writeDirection:direction];
-                return;
-            }
+            [mark setObject:directionData forKey:key];
         }
     }
+    NSLog(@" ====================================== ");
+//    [windowController writeDirection:directions];
+    return true;
+}
 
+static void updateDirections(NSEvent* event) {
+    // not thread safe
+    NSPoint newLocation = event.locationInWindow;
+    
+    double deltaX = newLocation.x - lastLocation.x;
+    double deltaY = newLocation.y - lastLocation.y;
+//    double absX = fabs(deltaX);
+//    double absY = fabs(deltaY);
+//    if (absX + absY < 20) {
+//        return; // ignore short distance
+//    }
+//    [windowController writePoint: &newLocation];
+//    NSLog(@"deltaX = %f , deltaY = %f)", deltaX, deltaY);
+//    NSLog(@"newLocation  (%f , %f)", newLocation.x, newLocation.y);
+//    NSLog(@"lastLocation (%f , %f)", lastLocation.x, lastLocation.y);
+//    lastLocation = event.locationInWindow;
+    // direction enum:
+    //  7   8   9
+    //  4       6
+    //  1   2   3
+    int angle = (int)180/M_PI*atan2(deltaY,deltaX);
+    int space = 15;
+    bool isAppend = false;
+    if(angle > 0){
+        if(angle > 90 - space && angle < 90 + space){
+            NSLog(@" 向上 > %f", 180/M_PI*atan2(deltaY,deltaX));
+            isAppend = appendDirection(@"8", event.locationInWindow);
+        }else if(angle < space){
+            NSLog(@" 向右 > %f", 180/M_PI*atan2(deltaY,deltaX));
+            isAppend = appendDirection(@"6", event.locationInWindow);
+        }else if(angle >= space && angle < 90 - space){
+            NSLog(@" 右上斜 > %f", 180/M_PI*atan2(deltaY,deltaX));
+            isAppend = appendDirection(@"9", event.locationInWindow);
+        }else if(angle > 180 - space){
+            NSLog(@" 向左 > %f", 180/M_PI*atan2(deltaY,deltaX));
+            isAppend = appendDirection(@"4", event.locationInWindow);
+        }else if(angle >= 90 + space && angle <= 180 - space){
+            NSLog(@" 左上斜 > %f", 180/M_PI*atan2(deltaY,deltaX));
+            isAppend = appendDirection(@"7", event.locationInWindow);
+        }
+    } else if(angle < 0){
+        angle = abs(angle);
+        if(angle > 90 - space && angle < 90 + space){
+            NSLog(@" 向下 > %f", 180/M_PI*atan2(deltaY,deltaX));
+            isAppend = appendDirection(@"2", event.locationInWindow);
+        }else if(angle < space){
+            NSLog(@" 向右 > %f", 180/M_PI*atan2(deltaY,deltaX));
+            isAppend = appendDirection(@"6", event.locationInWindow);
+        }else if(angle >= space && angle < 90 - space){
+            NSLog(@" 右下斜 > %f", 180/M_PI*atan2(deltaY,deltaX));
+            isAppend = appendDirection(@"3", event.locationInWindow);
+        }else if(angle > 180 - space){
+            NSLog(@" 向左 > %f", 180/M_PI*atan2(deltaY,deltaX));
+            isAppend = appendDirection(@"4", event.locationInWindow);
+        }else if(angle >= 90 + space && angle <= 180 - space){
+            NSLog(@" 左下斜 > %f", 180/M_PI*atan2(deltaY,deltaX));
+            isAppend = appendDirection(@"1", event.locationInWindow);
+        }
+    }
 }
 
 static bool handleGesture() {
-    return [[RulesList sharedRulesList] handleGesture:direction];
+    return [[RulesList sharedRulesList] handleGesture:directions];
 }
 
 void resetDirection(){
-    [direction setString:@""];
+    [mark removeAllObjects];
+    [directions removeAllObjects];
 }
-
-
-
 
 static CGEventRef mouseEventCallback(CGEventTapProxy proxy, CGEventType type, CGEventRef event, void *refcon) {
     // not thread safe, but it's always called in main thread
@@ -203,6 +282,8 @@ static CGEventRef mouseEventCallback(CGEventTapProxy proxy, CGEventType type, CG
             mouseDownEvent = event;
             CFRetain(mouseDownEvent);
             lastLocation = mouseEvent.locationInWindow;
+            // lzw
+            // [windowController writePoint: &lastLocation];
             break;
         case kCGEventRightMouseDragged:
             if (mouseDownEvent) {
@@ -235,6 +316,7 @@ static CGEventRef mouseEventCallback(CGEventTapProxy proxy, CGEventType type, CG
                 CFRelease(mouseDraggedEvent);
             }
             mouseDownEvent = mouseDraggedEvent = NULL;
+            lastLocation = NSMakePoint(0, 0);
             resetDirection();
             break;
         }

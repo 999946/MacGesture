@@ -116,11 +116,12 @@ static inline void pressKeyWithFlags(CGKeyCode virtualKey, CGEventFlags flags) {
     return YES;
 }
 
-- (NSInteger)suitedRuleWithGesture:(NSString*)gesture {
+- (NSInteger)suitedRuleWithGesture:(NSMutableArray*)gesture {
+    NSString *gestureStr = [gesture componentsJoinedByString:@""];
     for(NSUInteger i=0;i<[self count];i++){
         if(wildLike(frontBundleName(), [self filterAtIndex:i])){
             // wild filter ensured
-            if([gesture isEqualToString:[self directionAtIndex:i]]){
+            if([gestureStr isEqualToString:[self directionAtIndex:i]]){
                 return i;
             }
         }
@@ -128,14 +129,14 @@ static inline void pressKeyWithFlags(CGKeyCode virtualKey, CGEventFlags flags) {
     return -1;
 }
 
-- (bool)handleGesture:(NSString *)gesture {
+- (bool)handleGesture:(NSMutableArray *)gesture {
 
     NSInteger i = [self suitedRuleWithGesture:gesture];
     if(i != -1){
         [self executeActionAt:i];
         return YES;
     }
-    if(gesture.length<2){
+    if(gesture.count < 2){
         return NO;
     }else{
         return YES;
